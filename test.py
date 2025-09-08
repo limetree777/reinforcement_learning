@@ -73,7 +73,7 @@ def test_model(model_path, seed, use_custom_wrapper, video_folder):
 
 if __name__ == "__main__":
     # --- 테스트 설정 ---
-    MODEL_PATH = "results/ppo_walker2d_tensorboard/best_distance_model.zip" 
+    MODEL_PATH = "results/ppo_walker2d_tensorboard/ppo_walker2d_tensorboard_final.zip" 
     SEED = 42
     VIDEO_FOLDER = "videos_test/"
     

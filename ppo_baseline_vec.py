@@ -4,13 +4,15 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import SubprocVecEnv
 import numpy as np
 import os
 import torch
 
 # --- 2. 커스텀 평가 콜백 클래스 정의 ---
 class AdvancedEvalCallback(BaseCallback):
-    def __init__(self, eval_env, save_path, eval_freq=20000, n_eval_episodes=5, verbose=1):
+    def __init__(self, eval_env, save_path, eval_freq=100000, n_eval_episodes=5, verbose=1):
         super(AdvancedEvalCallback, self).__init__(verbose)
         self.eval_env = eval_env
         self.save_path = save_path
@@ -22,7 +24,10 @@ class AdvancedEvalCallback(BaseCallback):
         self.best_mean_stability = np.inf
 
     def _on_step(self) -> bool:
-        if self.n_calls % self.eval_freq == 0:
+        # Vectorized Environment에서는 self.n_calls가 n_envs 만큼씩 증가합니다.
+        # eval_freq를 그에 맞게 조정하거나, 정확한 step 기반 평가를 위해 self.num_timesteps를 사용합니다.
+        # 여기서는 self.num_timesteps를 사용하는 것이 더 직관적입니다.
+        if self.num_timesteps % self.eval_freq == 0:
             episode_distances, episode_stabilities = [], []
             for _ in range(self.n_eval_episodes):
                 obs, info = self.eval_env.reset()
@@ -69,19 +74,22 @@ class AdvancedEvalCallback(BaseCallback):
 
 # --- 3. 메인 훈련 코드 ---
 if __name__ == "__main__":
-    MODEL_NAME = "ppo_walker2d_tensorboard"
+    MODEL_NAME = "ppo_walker2d_vectorized"
     SAVE_PATH = f"results/{MODEL_NAME}/"
     LOG_PATH = "tensorboard_logs/"
     TOTAL_TIMESTEPS = 3000000
     SEED = 42
+
+    # --- 병렬로 실행할 환경 수 지정 ---
+    # CPU 코어 수에 맞춰 적절히 조절하는 것이 좋습니다. (예: 4, 8, 16)
+    N_ENVS = 8 
 
     set_random_seed(SEED)
     os.makedirs(SAVE_PATH, exist_ok=True)
     os.makedirs(LOG_PATH, exist_ok=True)
 
     # 훈련용 환경
-    train_env = gym.make("Walker2d-v5")
-    train_env = Monitor(train_env, SAVE_PATH)
+    train_env = make_vec_env("Walker2d-v5", n_envs=N_ENVS, seed=SEED, vec_env_cls=SubprocVecEnv)
 
     # 평가용 환경
     eval_env = gym.make("Walker2d-v5")
